@@ -1,0 +1,1 @@
+web: python bot_kond2.py
