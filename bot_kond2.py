@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 # Стадії для розмови
 NAME, PHONE, TYPE, SERVICE, ADDRESS, TIME, COMMENT, PHOTO = range(8)
 
-# ID користувача, який отримає заявку (НЕ username)
+# ID користувача, який отримає заявку
 OWNER_ID = 7224980019  # заміни на свій Telegram ID
 
 # Список послуг
@@ -32,12 +32,15 @@ services = {
     ]
 }
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Старт
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE): 
     await update.message.reply_text(
-        "Спершу, будь ласка, напишіть своє ім’я:"
+        "Привіт! 👋 Я — Дмитро, ваш надійний майстер з обслуговування кондиціонерів в Одесі.\n"
+        "Допоможу швидко, якісно та з гарантією. Напишіть, будь ласка, Ваше ім'я:"
     )
     return NAME
 
+# Ім’я
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text
     context.user_data["name"] = name
@@ -52,10 +55,11 @@ async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return TYPE
 
+# Тип кондиціонера
 async def get_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    type_selected = update.message.text
+    type_selected = update.message.text.strip().capitalize()
     if type_selected not in services:
-        await update.message.reply_text("Будь ласка, оберіть один із варіантів з клавіатури.")
+        await update.message.reply_text("⚠️ Будь ласка, оберіть один із варіантів з клавіатури.")
         return TYPE
 
     context.user_data["type"] = type_selected
@@ -66,6 +70,7 @@ async def get_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return SERVICE
 
+# Послуга
 async def get_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["service"] = update.message.text
     await update.message.reply_text(
@@ -73,16 +78,19 @@ async def get_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Я зателефоную або напишу Вам для уточнення деталей.")
     return PHONE
 
+# Телефон
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["phone"] = update.message.text
     await update.message.reply_text("📍 Залиште, будь ласка, адресу або назву району, де потрібно виконати роботу.")
     return ADDRESS
 
+# Адреса
 async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["address"] = update.message.text
     await update.message.reply_text("🕒 Коли Вам зручно, щоб я приїхав? Вкажіть день і бажаний час.")
     return TIME
 
+# Час
 async def get_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["time"] = update.message.text
 
@@ -94,9 +102,10 @@ async def get_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return COMMENT
 
+# Коментар
 async def get_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().lower()
-    if text == "Пропустити":
+    if text == "пропустити":
         context.user_data["comment"] = "-"
     else:
         context.user_data["comment"] = update.message.text
@@ -109,11 +118,15 @@ async def get_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return PHOTO
 
+# Фото або пропуск
 async def get_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.photo:
         context.user_data["photo"] = update.message.photo[-1].file_id
-    else:
+    elif update.message and update.message.text and update.message.text.strip().lower() == "пропустити":
         context.user_data["photo"] = None
+    else:
+        await update.message.reply_text("Будь ласка, надішліть фото або натисніть «Пропустити».")
+        return PHOTO
 
     text = (
         f"🔧 Нова заявка:\n"
@@ -139,10 +152,16 @@ async def get_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+# Скасування
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Заявку скасовано.", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
+# Логування помилок
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logging.error(f"❌ Exception: {context.error}")
+
+# Запуск бота
 def main():
     load_dotenv()
     token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -157,9 +176,9 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
-            PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
             TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_type)],
             SERVICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_service)],
+            PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
             ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_address)],
             TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_time)],
             COMMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_comment)],
@@ -169,6 +188,7 @@ def main():
     )
 
     app.add_handler(conv)
+    app.add_error_handler(error_handler)
     app.run_polling()
 
 if __name__ == "__main__":
